@@ -110,7 +110,7 @@
               <div id="liveStatus" class="player-status">Sélectionne une chaîne pour démarrer.</div>
             </div>
             <div class="player-bar">
-              <button id="liveModeBtn" class="chip" title="Changer de moteur">Moteur : MPEGTS</button>
+              <button id="liveModeBtn" class="chip" title="Changer de moteur">Moteur : HLS</button>
               <button id="liveReload" class="chip" title="Recharger le flux">↻ Recharger</button>
               <button id="liveFs" class="chip" title="Plein écran">⛶ Plein écran</button>
             </div>
