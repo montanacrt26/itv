@@ -192,11 +192,11 @@ img{display:block}
 }
 .card{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;cursor:pointer;transition:.18s;display:flex;flex-direction:column;
+  overflow:hidden;cursor:pointer;transition:.18s;display:block;
 }
 .card:hover{transform:translateY(-3px);border-color:var(--accent);box-shadow:0 10px 26px rgba(0,0,0,.4)}
 .card-thumb{
-  aspect-ratio:2/3;background:var(--bg-2);display:grid;place-items:center;position:relative;overflow:hidden;
+  width:100%;aspect-ratio:2/3;background:var(--bg-2);display:grid;place-items:center;position:relative;overflow:hidden;
 }
 .card-thumb img{width:100%;height:100%;object-fit:cover}
 .card-thumb .ph{font-size:30px;font-weight:800;color:var(--muted)}
