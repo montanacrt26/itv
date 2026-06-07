@@ -24,7 +24,7 @@
   // Lecteur LIVE (embarqué)
   let liveHls = null;
   let liveMpegts = null;
-  let liveMode = "mpegts";       // mpegts | hls
+  let liveMode = "hls";          // mpegts | hls
   let currentLive = null;        // { id, name }
 
   // Lecteur VOD (overlay)
@@ -345,12 +345,12 @@
     if (v) { try { v.onratechange = null; v.playbackRate = 1; v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} }
   }
 
-  // Lecture LIVE : mpegts (.ts continu) prioritaire, repli HLS
+  // Lecture LIVE : HLS prioritaire (par défaut), repli mpegts (.ts continu)
   function playLive(id, name) {
     currentLive = { id, name };
     $("#nowPlaying").textContent = name;
     markActiveChannel(id);
-    startLiveMpegts(true);
+    startLiveHls(true);
   }
 
   function startLiveMpegts(allowFallback) {
