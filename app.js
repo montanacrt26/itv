@@ -21,6 +21,12 @@
   let items = [];                // contenu de la catégorie courante
   let searchTerm = "";
 
+  // Rendu incrémental de la grille (évite de créer des milliers de cartes d'un coup)
+  let gridIO = null;             // IntersectionObserver pour le chargement progressif
+  let gridData = [];             // liste en cours d'affichage
+  let gridShown = 0;             // nombre de cartes déjà rendues
+  const GRID_BATCH = 60;         // cartes ajoutées par lot
+
   // Lecteur LIVE (embarqué)
   let liveHls = null;
   let liveMpegts = null;
@@ -288,13 +294,38 @@
   // ---------- Grille (VOD / SÉRIES) ----------
   function renderGrid() {
     const grid = $("#grid");
+    // Réinitialise l'observateur précédent et le contenu
+    if (gridIO) { gridIO.disconnect(); gridIO = null; }
     grid.innerHTML = "";
-    const data = filtered();
-    if (!data.length) { showGridEmpty(true); return; }
+    gridData = filtered();
+    gridShown = 0;
+    if (!gridData.length) { showGridEmpty(true); return; }
     showGridEmpty(false);
+
+    // Premier lot
+    appendGridBatch();
+
+    // Sentinelle de fin de liste : charge le lot suivant à l'approche du bas
+    const sentinel = el("div", "grid-sentinel");
+    grid.appendChild(sentinel);
+    gridIO = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        appendGridBatch();
+        // Replace la sentinelle à la fin pour continuer le chargement
+        if (gridShown < gridData.length) grid.appendChild(sentinel);
+        else { gridIO.disconnect(); gridIO = null; sentinel.remove(); }
+      }
+    }, { root: grid, rootMargin: "600px 0px" });
+    gridIO.observe(sentinel);
+  }
+
+  function appendGridBatch() {
+    const grid = $("#grid");
+    const end = Math.min(gridShown + GRID_BATCH, gridData.length);
     const frag = document.createDocumentFragment();
-    data.forEach((it) => frag.appendChild(buildCard(it)));
+    for (let i = gridShown; i < end; i++) frag.appendChild(buildCard(gridData[i]));
     grid.appendChild(frag);
+    gridShown = end;
   }
   function buildCard(it) {
     const card = el("div", "card");
