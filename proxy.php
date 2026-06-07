@@ -17,8 +17,9 @@ error_reporting(0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Methods: GET, HEAD, OPTIONS');
     header('Access-Control-Allow-Headers: *');
+    header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges');
     exit;
 }
 
@@ -104,8 +105,20 @@ if ($isPlaylist) {
     exit;
 }
 
-/* ---------- Cas 2 : JSON API / segments .ts / flux live -> streaming brut ---------- */
+/* ---------- Cas 2 : JSON API / segments .ts / flux live / VOD -> streaming brut ----------
+   Important : on relaie l'en-tête Range du navigateur et on renvoie le statut + les
+   en-têtes (Content-Range, Accept-Ranges, Content-Length) du serveur d'origine.
+   C'est ce qui permet d'AVANCER/RECULER dans un film (sinon il se comporte comme du live). */
 header('Access-Control-Allow-Origin: *');
+header('Access-Control-Expose-Headers: Content-Length, Content-Range, Accept-Ranges');
+
+// En-têtes transmis au serveur d'origine
+$fwdHeaders = ['Connection: keep-alive'];
+if (isset($_SERVER['HTTP_RANGE']) && $_SERVER['HTTP_RANGE'] !== '') {
+    $fwdHeaders[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
+}
+
+$isHead = ($_SERVER['REQUEST_METHOD'] === 'HEAD');
 
 $ch = curl_init($target);
 curl_setopt_array($ch, [
@@ -116,13 +129,21 @@ curl_setopt_array($ch, [
     CURLOPT_CONNECTTIMEOUT => 15,
     CURLOPT_TIMEOUT        => 0,
     CURLOPT_USERAGENT      => $userAgent,
-    CURLOPT_HTTPHEADER     => ['Connection: keep-alive'],
+    CURLOPT_HTTPHEADER     => $fwdHeaders,
+    CURLOPT_NOBODY         => $isHead,
     CURLOPT_BUFFERSIZE     => 16384,
     CURLOPT_HEADER         => false,
     CURLOPT_HEADERFUNCTION => function ($ch, $headerLine) {
-        // On transfère uniquement le Content-Type d'origine
-        if (stripos($headerLine, 'Content-Type:') === 0) {
-            header(trim($headerLine));
+        $line = trim($headerLine);
+        // Statut HTTP d'origine (ex : 206 Partial Content pour une lecture avec Range)
+        if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#i', $line, $m)) {
+            http_response_code((int) $m[1]);
+            return strlen($headerLine);
+        }
+        // On relaie les en-têtes utiles à la lecture VOD (seek) et au type de contenu
+        $lower = strtolower($line);
+        foreach (['content-type:', 'content-length:', 'content-range:', 'accept-ranges:'] as $h) {
+            if (strpos($lower, $h) === 0) { header($line); break; }
         }
         return strlen($headerLine);
     },
@@ -135,5 +156,7 @@ curl_setopt_array($ch, [
 ]);
 
 while (ob_get_level() > 0) { @ob_end_flush(); }
+// Indique au navigateur que la ressource accepte les requêtes Range (utile si l'origine l'omet)
+header('Accept-Ranges: bytes');
 curl_exec($ch);
 curl_close($ch);
