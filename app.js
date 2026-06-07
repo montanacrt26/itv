@@ -43,6 +43,10 @@
   const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
   function proxied(url) { return "proxy.php?url=" + encodeURIComponent(url); }
 
+  // Icônes étoile (SVG) — pleine (favori actif) et contour (non favori)
+  const STAR_FILLED_SVG = '<svg class="star-ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.56l-5.91 3.1 1.13-6.57L2.45 9.44l6.6-.96L12 2.5z"/></svg>';
+  const STAR_OUTLINE_SVG = '<svg class="star-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5l2.95 5.98 6.6.96-4.77 4.65 1.13 6.57L12 17.56l-5.91 3.1 1.13-6.57L2.45 9.44l6.6-.96L12 2.5z"/></svg>';
+
   // ---------- localStorage ----------
   function getProfiles() {
     try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch (e) { return []; }
@@ -59,6 +63,33 @@
   function removeProfile(key) {
     saveProfiles(getProfiles().filter((x) => (x.host + "|" + x.user) !== key));
     renderSavedProfiles();
+  }
+
+  // ---------- Favoris (LIVE) ----------
+  // Stockés par profil : { "host|user": [ {stream_id, name, stream_icon}, ... ] }
+  function profileKey() { return profile ? (profile.host + "|" + profile.user) : ""; }
+  function getFavStore() {
+    try { return JSON.parse(localStorage.getItem(LS_FAV)) || {}; } catch (e) { return {}; }
+  }
+  function saveFavStore(store) { localStorage.setItem(LS_FAV, JSON.stringify(store)); }
+  function getFavorites() {
+    const store = getFavStore();
+    return Array.isArray(store[profileKey()]) ? store[profileKey()] : [];
+  }
+  function isFav(id) { return getFavorites().some((f) => f.stream_id == id); }
+  function toggleFav(it) {
+    const store = getFavStore();
+    const key = profileKey();
+    const list = Array.isArray(store[key]) ? store[key] : [];
+    const i = list.findIndex((f) => f.stream_id == it.stream_id);
+    if (i >= 0) {
+      list.splice(i, 1);
+    } else {
+      list.push({ stream_id: it.stream_id, name: it.name || "Chaîne", stream_icon: it.stream_icon || "" });
+    }
+    store[key] = list;
+    saveFavStore(store);
+    return i < 0; // true si ajouté
   }
 
   // ---------- API Xtream ----------
@@ -164,6 +195,7 @@
     $("#profileInitial").textContent = (profile.name || profile.user || "?").charAt(0).toUpperCase();
     section = "live";
     setActiveTab();
+    syncLiveFavBtn();
     loadSection();
   }
   function logout() {
@@ -173,6 +205,25 @@
     $("#app").classList.add("hidden");
     $("#loginScreen").classList.remove("hidden");
     renderSavedProfiles();
+  }
+
+  // ---------- Sidebar (mobile) ----------
+  function isMobile() { return window.matchMedia("(max-width:820px)").matches; }
+  function syncTopbarHeight() {
+    const tb = document.querySelector(".topbar");
+    if (tb) document.documentElement.style.setProperty("--topbar-h", tb.offsetHeight + "px");
+  }
+  function openSidebar() {
+    syncTopbarHeight();
+    $("#sidebar").classList.add("open");
+    $("#sidebarBackdrop").classList.remove("hidden");
+  }
+  function closeSidebar() {
+    $("#sidebar").classList.remove("open");
+    $("#sidebarBackdrop").classList.add("hidden");
+  }
+  function toggleSidebar() {
+    $("#sidebar").classList.contains("open") ? closeSidebar() : openSidebar();
   }
 
   // ---------- Sections ----------
@@ -208,8 +259,10 @@
       const cats = await api(catAction);
       categories = Array.isArray(cats) ? cats : [];
       renderCategories();
-      if (categories.length) selectCategory(categories[0].category_id);
-      else { showRailLoader(false); showGridLoader(false); isLive ? showRailEmpty(true) : showGridEmpty(true); }
+      // En LIVE, on ouvre la catégorie "Favoris" par défaut
+      if (isLive) selectCategory(FAV_CAT);
+      else if (categories.length) selectCategory(categories[0].category_id);
+      else { showRailLoader(false); showGridLoader(false); showGridEmpty(true); }
     } catch (e) {
       showRailLoader(false); showGridLoader(false);
       isLive ? showRailEmpty(true) : showGridEmpty(true);
@@ -219,6 +272,20 @@
   function renderCategories() {
     const list = $("#categoryList");
     list.innerHTML = "";
+
+    // Pseudo-catégorie "Favoris" tout en haut (LIVE uniquement)
+    if (section === "live") {
+      const fav = el("button", "cat-item cat-fav");
+      fav.dataset.id = FAV_CAT;
+      fav.title = "Favoris";
+      const star = el("span", "cat-star");
+      star.innerHTML = STAR_FILLED_SVG;
+      const lbl = el("span"); lbl.textContent = "Favoris";
+      fav.appendChild(star); fav.appendChild(lbl);
+      fav.onclick = () => selectCategory(FAV_CAT);
+      list.appendChild(fav);
+    }
+
     categories.forEach((c) => {
       const b = el("button", "cat-item");
       b.textContent = c.category_name;
@@ -233,10 +300,19 @@
     activeCat = catId;
     document.querySelectorAll(".cat-item").forEach((b) =>
       b.classList.toggle("active", b.dataset.id == catId));
+    if (isMobile()) closeSidebar();
 
     const isLive = section === "live";
     if (isLive) { $("#channelList").innerHTML = ""; showRailEmpty(false); showRailLoader(true); }
     else { $("#grid").innerHTML = ""; showGridEmpty(false); showGridLoader(true); }
+
+    // Catégorie spéciale "Favoris" : on lit directement le localStorage
+    if (isLive && catId === FAV_CAT) {
+      items = getFavorites();
+      showRailLoader(false);
+      renderChannelRail();
+      return;
+    }
 
     const action = { live: "get_live_streams", vod: "get_vod_streams", series: "get_series" }[section];
     try {
@@ -264,7 +340,7 @@
 
     const frag = document.createDocumentFragment();
     data.forEach((it) => {
-      const row = el("button", "ch-item");
+      const row = el("div", "ch-item");
       row.dataset.id = it.stream_id;
       if (currentLive && currentLive.id == it.stream_id) row.classList.add("active");
 
@@ -281,8 +357,29 @@
       const sub = el("div", "ch-sub"); sub.textContent = "● LIVE";
       text.appendChild(nm); text.appendChild(sub);
 
-      row.appendChild(logo); row.appendChild(text);
-      row.onclick = () => playLive(it.stream_id, name);
+      // Étoile jaune (ajout / retrait des favoris)
+      const favBtn = el("button", "fav-btn");
+      const on = isFav(it.stream_id);
+      if (on) favBtn.classList.add("on");
+      favBtn.innerHTML = on ? STAR_FILLED_SVG : STAR_OUTLINE_SVG;
+      favBtn.title = on ? "Retirer des favoris" : "Ajouter aux favoris";
+      favBtn.onclick = (e) => {
+        e.stopPropagation();
+        const added = toggleFav(it);
+        favBtn.classList.toggle("on", added);
+        favBtn.innerHTML = added ? STAR_FILLED_SVG : STAR_OUTLINE_SVG;
+        favBtn.title = added ? "Retirer des favoris" : "Ajouter aux favoris";
+        syncLiveFavBtn();
+        // Si on est dans la vue Favoris, retirer = enlever la ligne immédiatement
+        if (activeCat === FAV_CAT && !added) {
+          row.remove();
+          items = getFavorites();
+          if (!items.length) showRailEmpty(true);
+        }
+      };
+
+      row.appendChild(logo); row.appendChild(text); row.appendChild(favBtn);
+      row.onclick = () => playLive(it.stream_id, name, it);
       frag.appendChild(row);
     });
     list.appendChild(frag);
@@ -379,11 +476,45 @@
   }
 
   // Lecture LIVE : HLS prioritaire (par défaut), repli mpegts (.ts continu)
-  function playLive(id, name) {
-    currentLive = { id, name };
+  function playLive(id, name, it) {
+    currentLive = { id, name, item: it || { stream_id: id, name: name } };
     $("#nowPlaying").textContent = name;
     markActiveChannel(id);
+    syncLiveFavBtn();
     startLiveHls(true);
+  }
+
+  // Synchronise l'état du bouton "Ajouter aux favoris" de la barre du lecteur
+  function syncLiveFavBtn() {
+    const btn = $("#liveFav");
+    if (!btn) return;
+    if (!currentLive) {
+      btn.classList.remove("fav-on");
+      btn.textContent = "☆ Ajouter aux favoris";
+      btn.disabled = true;
+      return;
+    }
+    btn.disabled = false;
+    const on = isFav(currentLive.id);
+    btn.classList.toggle("fav-on", on);
+    btn.textContent = on ? "★ Retirer des favoris" : "☆ Ajouter aux favoris";
+  }
+
+  function toggleCurrentLiveFav() {
+    if (!currentLive) return;
+    const added = toggleFav(currentLive.item);
+    syncLiveFavBtn();
+    // Met à jour l'étoile de la ligne correspondante dans le rail
+    const row = document.querySelector('.ch-item[data-id="' + currentLive.id + '"]');
+    if (row) {
+      const fb = row.querySelector(".fav-btn");
+      if (fb) {
+        fb.classList.toggle("on", added);
+        fb.innerHTML = added ? STAR_FILLED_SVG : STAR_OUTLINE_SVG;
+      }
+    }
+    // Si la vue Favoris est ouverte, rafraîchir la liste
+    if (activeCat === FAV_CAT) selectCategory(FAV_CAT);
   }
 
   function startLiveMpegts(allowFallback) {
@@ -629,9 +760,15 @@
 
     $("#profileBtn").onclick = () => { if (confirm("Se déconnecter ?")) logout(); };
 
+    // Sidebar mobile
+    $("#menuBtn").onclick = toggleSidebar;
+    $("#sidebarBackdrop").onclick = closeSidebar;
+    window.addEventListener("resize", () => { syncTopbarHeight(); if (!isMobile()) closeSidebar(); });
+
     // Lecteur LIVE
     $("#liveModeBtn").onclick = toggleLiveMode;
     $("#liveReload").onclick = reloadLive;
+    $("#liveFav").onclick = toggleCurrentLiveFav;
     $("#liveFs").onclick = liveFullscreen;
 
     // Lecteur VOD
@@ -646,6 +783,7 @@
       if (e.key === "Escape") {
         if (!$("#playerOverlay").classList.contains("hidden")) closeVodPlayer();
         else if (!$("#detailOverlay").classList.contains("hidden")) closeDetail();
+        else if ($("#sidebar").classList.contains("open")) closeSidebar();
       }
     });
   }
