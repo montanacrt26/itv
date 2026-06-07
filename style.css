@@ -125,8 +125,15 @@ img{display:block;max-width:100%}
 }
 .icon-btn:hover{border-color:var(--accent)}
 .icon-btn.close{font-size:14px}
+.menu-btn{display:none;font-size:17px}
 
-.layout{display:flex;flex:1;min-height:0}
+.layout{display:flex;flex:1;min-height:0;position:relative}
+
+/* Voile derrière la sidebar (mobile) */
+.sidebar-backdrop{
+  position:fixed;inset:var(--topbar-h,50px) 0 0 0;z-index:25;background:rgba(3,6,10,.55);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+}
 
 /* --------------------------- Sidebar ----------------------------- */
 .sidebar{
@@ -293,15 +300,63 @@ img{display:block;max-width:100%}
 @media(max-width:1000px){
   .channel-rail{width:250px}
 }
+
+/* ---- Tablette / mobile (<=820px) ---- */
 @media(max-width:820px){
   :root{--card-min:120px;--card-max:150px}
+
+  .menu-btn{display:grid}
+
   .topbar{flex-wrap:wrap;height:auto;padding:9px 12px;gap:9px}
-  .nav-tabs{order:3}
+  .nav-tabs{order:3;flex:1 0 100%;justify-content:center}
+  .nav-tab{flex:1;text-align:center}
   .search{width:130px}
-  .sidebar{position:fixed;left:0;top:50px;bottom:0;z-index:30;transform:translateX(-100%);transition:.25s;box-shadow:var(--shadow)}
+
+  /* Sidebar en panneau coulissant */
+  .sidebar{
+    position:fixed;left:0;top:var(--topbar-h,50px);bottom:0;z-index:30;width:260px;max-width:82vw;
+    transform:translateX(-100%);transition:transform .25s ease;box-shadow:var(--shadow);
+  }
   .sidebar.open{transform:none}
+
+  /* Vue live empilée : lecteur en haut, chaînes en dessous */
   .live-view{flex-direction:column}
   .player-pane{padding:10px;flex:none}
   .player-pane .video-wrap{max-height:none}
-  .channel-rail{width:100%;border-left:none;border-top:1px solid var(--border);flex:1}
+  .channel-rail{width:100%;border-left:none;border-top:1px solid var(--border);flex:1;min-height:240px}
+
+  .player-overlay,.detail-overlay{padding:0}
+  .player-box{border-radius:0;max-width:100%}
+}
+
+/* ---- Téléphone (<=560px) ---- */
+@media(max-width:560px){
+  :root{--card-min:100px;--card-max:160px}
+  body{font-size:13px}
+
+  .topbar{padding:8px 10px;gap:8px}
+  .topbar-title{display:none}
+  .topbar-right{gap:6px}
+  .search{flex:1;width:auto;max-width:none;min-width:0}
+
+  .grid{padding:10px 12px 24px;gap:10px}
+  .card{flex:1 1 var(--card-min);max-width:none}
+
+  .player-bar{gap:6px}
+  .chip{padding:8px 10px;font-size:11px}
+
+  .detail-box{padding:16px}
+  .detail-head{gap:14px}
+  .detail-poster{width:120px;margin:0 auto}
+  .detail-info{min-width:0;text-align:center}
+  .detail-info h2{font-size:18px}
+
+  .login-card{padding:18px}
+}
+
+/* Cibles tactiles plus confortables */
+@media(hover:none){
+  .ch-item{padding:9px 8px}
+  .fav-btn{width:34px;height:34px}
+  .cat-item{min-height:42px}
 }
