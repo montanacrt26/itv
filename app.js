@@ -12,6 +12,8 @@
 
   const LS_KEY = "xenon_profiles";
   const LS_LAST = "xenon_last";
+  const LS_FAV = "xenon_favorites";   // favoris LIVE par profil
+  const FAV_CAT = "__fav__";          // identifiant de la pseudo-catégorie Favoris
 
   // État
   let profile = null;            // { name, host, user, pass }
