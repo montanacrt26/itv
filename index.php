@@ -74,6 +74,7 @@
   <div id="app" class="app hidden">
     <header class="topbar">
       <div class="topbar-left">
+        <button id="menuBtn" class="icon-btn menu-btn" title="Catégories" aria-label="Ouvrir les catégories">☰</button>
         <div class="brand-mark small">X</div>
         <span class="topbar-title">XENON</span>
       </div>
@@ -91,7 +92,8 @@
     </header>
 
     <div class="layout">
-      <aside class="sidebar">
+      <div id="sidebarBackdrop" class="sidebar-backdrop hidden"></div>
+      <aside id="sidebar" class="sidebar">
         <div class="sidebar-title">Catégories</div>
         <div id="categoryList" class="category-list"></div>
       </aside>
@@ -112,6 +114,7 @@
             <div class="player-bar">
               <button id="liveModeBtn" class="chip" title="Changer de moteur">Moteur : HLS</button>
               <button id="liveReload" class="chip" title="Recharger le flux">↻ Recharger</button>
+              <button id="liveFav" class="chip" title="Ajouter aux favoris">☆ Ajouter aux favoris</button>
               <button id="liveFs" class="chip" title="Plein écran">⛶ Plein écran</button>
             </div>
           </div>
